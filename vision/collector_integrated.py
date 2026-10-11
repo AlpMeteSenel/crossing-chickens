@@ -45,6 +45,9 @@ class Hub:
         self.auto_led=False;self.manual=None;self.manual_revision=0;self.applied_revision=0
         self.auto_applied=False;self.led_signature=None;self.command_latency=None;self.mode_confirmed_latency=None
         self.last_command=None;self.error=None;self.sensors=None;self.mcu_ok=False;self.last_mcu=0
+        self.traffic=[0,0,0]
+        self.traffic_lights=None
+        self.countdown=None
         self.brightness=10;self.brightness_applied=None
         try:
             saved=json.loads((ROOT/'led_settings.json').read_text()).get('brightness',10)
@@ -135,12 +138,18 @@ class Hub:
                     self.bridge=Bridge('unix:///run/arduino-router.sock');self.bridge.connect()
             return self.bridge.call(name,*args,timeout=1.5)
         return await loop.run_in_executor(self.pool,invoke)
+    def node_cfg_report(self):
+        try:
+            d=json.loads(Path(os.environ.get('NODE_CFG_PATH','/home/arduino/swarmflow-uplink/nodes_cfg.json')).read_text())
+            return {'cfg':int(d.get('v',0)),'cfg_hash':str(d.get('hash',''))[:16]}
+        except Exception:return {'cfg':None,'cfg_hash':None}
     def payload(self):
         now=time.time();f=self.frame
         age=max(0,(now-f.get('capture_ts',now))*1000) if f else None
         profile=self.profiles[self.control['source']]
         v=dict(self.engine.snapshot);v['events']=list(v.get('events',[]))+list(self.tamper.events);v['power_state']=(f or {}).get('power_state','active')
-        v.update(profile=profile,auto_led=self.auto_led,live=self.fresh_live(now),
+        v.update(profile=profile,auto_led=self.auto_led,live=self.fresh_live(now),traffic=self.traffic,traffic_lights=self.traffic_lights,countdown=self.countdown,
+            **self.node_cfg_report(),
             frame_age_ms=round(age) if age is not None else None,
             command_latency_ms=self.command_latency,mode_confirmed_ms=self.mode_confirmed_latency,
             led_command=self.last_command,model=self.control['model'],source=self.control['source'],
@@ -257,13 +266,25 @@ class Hub:
                         data=json.loads(msg.data)
                         if 'mode' in data:
                             mode=data['mode']
-                            if type(mode) is not int or not 0<=mode<=33:raise ValueError('Unknown animation')
+                            if type(mode) is not int or not 0<=mode<=34:raise ValueError('Unknown animation')
                             # Keep the dashboard Off command compatible with older firmware.
                             self.manual_command(('set_led',(0,0,0)) if mode==6 else ('set_mode',(mode,)))
                         if 'led' in data:
                             led=data['led']
                             if not isinstance(led,list) or len(led)!=3:raise ValueError('RGB requires three channels')
                             self.manual_command(('set_led',tuple(max(0,min(255,int(v))) for v in led)))
+                        if 'countdown' in data:
+                            self.countdown=int(data['countdown']) if data['countdown'] is not None else None
+                        if 'traffic_lights' in data:
+                            tl=data['traffic_lights']
+                            if isinstance(tl,list) and 1<=len(tl)<=8 and all(isinstance(f,(list,tuple)) and len(f)==3 for f in tl):
+                                self.traffic_lights=[list(map(int,f)) for f in tl]
+                        if 'traffic' in data:
+                            tr=data['traffic']
+                            if not isinstance(tr,list) or len(tr)!=3:raise ValueError('Traffic lights need [red, yellow, green] as 0 or 1')
+                            flags=[1 if int(float(v))>0 else 0 for v in tr]
+                            if await self.rpc('set_traffic_light',*flags) is not True:raise ValueError('The camera board rejected the traffic lights')
+                            self.traffic=flags
                     except (ValueError,TypeError) as e:await ws.send_json({'error':str(e)})
         finally:self.clients.discard(ws)
         return ws

@@ -68,8 +68,8 @@ def run(config):
    outbox.acknowledged_results(live['control_results']);last_good=time.time();last_error=None
    for command in answer.get('commands',[]):
     command_id=command.get('id');settings=command.get('config') or {}
-    if not command_id or not settings or any(k not in ('power_state','camera_mode','auto_led') for k in settings):continue
-    try:result=request(config['local_config'],settings);ok=result.get('ok') is True;outbox.done(command_id,{'id':command_id,'ok':ok,'error':None if ok else 'Node rejected setting'})
+    if not command_id or not settings or any(k not in ('camera_mode','auto_led','cfg') for k in settings):continue
+    try:result=request(config.get('cfg_endpoint',config['local_config']) if set(settings)=={'cfg'} else config['local_config'],settings);ok=result.get('ok') is True;outbox.done(command_id,{'id':command_id,'ok':ok,'error':None if ok else 'Node rejected setting'})
     except Exception as e:outbox.done(command_id,{'id':command_id,'ok':False,'error':str(e)[:160]})
    pending=outbox.pending()
    if pending:
