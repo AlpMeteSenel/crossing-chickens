@@ -102,7 +102,7 @@ uint32_t effect_traffic_segments() {
     const bool on = (seg == 0 && (s & 4)) || (seg == 1 && (s & 2)) || (seg == 2 && (s & 1));
     if (seg == 0) strip.setPixel(i, on ? 250 : 14, on ? 30 : 2, 0);
     else if (seg == 1) strip.setPixel(i, on ? 250 : 14, on ? 165 : 10, 0);
-    else strip.setPixel(i, 0, on ? 250 : 12, on ? 60 : 8);
+    else strip.setPixel(i, 0, on ? 250 : 12, 0);
   }
   return 100;
 }
