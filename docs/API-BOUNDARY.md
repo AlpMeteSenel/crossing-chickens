@@ -84,12 +84,10 @@ ESP32 nodes GET `/cfg/<id>` from their worker each 30s; apply if `hash` differs 
 
 ## 3. LED rule engine (config payload, peer-evaluated)
 
-### Traffic light (optional `cfg.led.traffic`)
-`{"enabled": bool, "green_s": 1-120, "yellow_s": 1-30, "red_s": 1-120, "extend_max_s": 0-60}`.
-When enabled the peer's uplink runs a red→green→yellow cycle: green stretches second-by-second while the crossing zone is occupied (capped at `green_s+extend_max_s`), red shortens toward a 1s floor while the street is clear, yellow is fixed. The phase is applied to the MCU as solid colors via the integrated app's `ws://127.0.0.1:8091/ws` (`{"led":[r,g,b]}`; red 255,0,0 · yellow 255,170,0 · green 0,255,0). Disabling restores `auto_led=true` and clears the strip. Dashboard UI: Camera settings → Traffic light (timings + live phase pill).
+### Traffic signal — separate system (`cfg.signal`)
+The three signal LEDs on MCU pins D8=red, D9=yellow, D10=green are driven by `cfg.signal`, a sibling of `cfg.led` with its own presets, rules and cooldown — the strip system is untouched. Shape: `{"fallback": "red|yellow|green", "cooldown_s": 0-300, "rules": [{name, when, led: red|yellow|green, on_s, off_s, priority}] (≤12, no "true" — the idle color is the fallback), "cycle": {"enabled": bool, "green_s": 1-120, "yellow_s": 1-30, "red_s": 1-120, "extend_max_s": 0-60}}`.
+Arbitration in the peer uplink (1 Hz): highest-priority ACTIVE signal rule wins; otherwise the timed cycle (green stretches while the crossing is occupied, capped at `green_s+extend_max_s`; red shrinks toward 1s when the street is clear; yellow fixed); otherwise the fallback color. Colors go to the MCU as `{"traffic":[r,y,g]}` over the integrated app's `ws://127.0.0.1:8091/ws` → `set_traffic_light` RPC; removing `cfg.signal` sends `[0,0,0]` and stops. Telemetry: `vision.traffic` in the state payload → dashboard phase pill. Dashboard UI: Camera settings → Traffic signal (idle color, cycle timings, own rule builder).
 `cfg` commands are routed by the publisher to the peer's `cfg_endpoint` (`GET/POST /cfg/<node>` on egg :9011, worker :9010) instead of the node's `/api/config`.
-
-**Rule-driven signal**: a preset may be `{"traffic":"red|yellow|green"}` (no mode/brightness) — rules then target the signal LEDs directly. The peer uplink arbitrates: an ACTIVE traffic rule wins over the timed cycle (FSM keeps running underneath); with no traffic rule active and the cycle enabled the cycle drives the LEDs; with neither the signal is off. Same `on_s/off_s/for_s/priority` debounce as strip rules.
 `cfg.led` shape:
 ```json
 {"presets": {"alert": {"mode":3,"brightness":95,"for_s":8}, "quiet": {"mode":21,"brightness":18}},
