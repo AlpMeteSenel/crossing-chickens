@@ -100,9 +100,9 @@ uint32_t effect_traffic_segments() {
   for (int i = 0; i < NUM_LEDS; i++) {
     const int seg = i * 3 / NUM_LEDS;
     const bool on = (seg == 0 && (s & 4)) || (seg == 1 && (s & 2)) || (seg == 2 && (s & 1));
-    if (seg == 0) strip.setPixel(i, on ? 250 : 0, on ? 30 : 0, 0);
-    else if (seg == 1) strip.setPixel(i, on ? 250 : 0, on ? 165 : 0, 0);
-    else strip.setPixel(i, 0, on ? 250 : 0, 0);
+    if (seg == 0) strip.setPixel(i, on ? 255 : 0, 0, 0);
+    else if (seg == 1) strip.setPixel(i, on ? 255 : 0, on ? 255 : 0, 0);
+    else strip.setPixel(i, 0, on ? 255 : 0, 0);
   }
   return 100;
 }
