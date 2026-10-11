@@ -14,6 +14,7 @@ from process_capture import ProcessCamera as CSICamera
 from vision_detail import focus_bounds,sweep_bounds,map_crop,merge_detections
 from marker_calibration import MarkerCalibration
 from camera_orientation import rotate_image,rotate_point,detail_crop
+from motion_security import MotionGate
 from ncnn_threads import ncnn_threads
 
 MODELS={
@@ -27,35 +28,19 @@ def atomic(path,data):
 def read_control():
     try:return json.loads((ROOT/'control.json').read_text())
     except (OSError,ValueError):return {'source':'camera','model':'ncnn-320'}
-def simulation(t):
-    image=np.full((540,900,3),(38,43,49),np.uint8)
-    cv2.rectangle(image,(70,90),(830,500),(61,65,71),-1)
-    for x in range(170,740,65):cv2.rectangle(image,(x,228),(x+35,305),(200,202,194),-1)
-    cv2.line(image,(70,360),(830,360),(110,112,115),2)
-    dets=[]
-    # Known synthetic motions; no model predictions or physical street measurements.
-    for index,(cls,y,period,offset,color) in enumerate([
-        ('car',.78,6,0,(210,135,70)),('bicycle',.67,7,2,(80,185,110)),('person',None,14,0,(75,190,225))]):
-        phase=((t+offset)%period)/period
-        x=.15+.7*phase if cls!='person' else .30+.40*phase
-        foot=.85-.7*phase if cls=='person' else y
-        bw,bh=(.085,.12) if cls=='car' else (.035,.09)
-        box=[(x-bw/2)*900,(foot-bh)*540,(x+bw/2)*900,foot*540]
-        a,b,c,d=map(int,box)
-        if cls=='person':
-            cv2.circle(image,((a+c)//2,b+8),7,color,-1);cv2.line(image,((a+c)//2,b+15),((a+c)//2,d-5),color,5)
-        else:cv2.rectangle(image,(a,b),(c,d),color,-1)
-        dets.append({'cls':cls,'conf':.94,'box':box})
-    cv2.putText(image,'SIMULATION - generated detections',(25,35),cv2.FONT_HERSHEY_SIMPLEX,.7,(210,220,230),2)
-    return image,dets
 
 def main():
     cap=None;active=None;model=None;model_id=None;stream=uuid.uuid4().hex
     sequence=0;next_probe=0;retry_delay=0;origin=time.monotonic();last_capture=0;fps=0;wb_revision=None
-    marker=None;marker_request=None;orientation=0
+    marker=None;marker_request=None;orientation=0;motion_gate=MotionGate(ROOT)
     try:
         while True:
             start=time.monotonic();control=read_control();source=control.get('source','camera')
+            if source=='camera' and control.get('motion_wake',True) and not motion_gate.awake(time.time()):
+                if cap:cap.release();cap=None
+                sequence+=1;fps=0;last_capture=0
+                atomic(ROOT/'vision.json',{'ts':time.time(),'capture_ts':time.time(),'stream_id':stream,'frame_id':sequence,'source_kind':'idle','src':'PIR standby','power_state':'standby','fps':0,'inference_ms':0,'dets':[],'frame':None,'w':0,'h':0,'camera_rotation':control.get('camera_rotation',0),'error':None})
+                time.sleep(.2);continue
             rotation=control.get('camera_rotation',0) if source=='camera' else 0
             if rotation!=orientation:
                 orientation=rotation;stream=uuid.uuid4().hex;last_capture=0;fps=0
@@ -64,9 +49,7 @@ def main():
                 if cap:cap.release()
                 cap=None;active=signature;stream=uuid.uuid4().hex;next_probe=0;origin=start
             frame=None;dets=[];error=None;kind='unavailable';src=source;capture_ts=time.time();motion_ts=None
-            if source=='simulation':
-                kind='simulation';frame,dets=simulation(start-origin)
-            elif source=='replay':
+            if source=='replay':
                 if cap is None:
                     path=Path(control.get('video_path','')).resolve()
                     if not path.is_relative_to((ROOT/'uploads').resolve()):raise ValueError('Replay path outside uploads')
@@ -174,7 +157,7 @@ def main():
             encode_ms=(time.monotonic()-encode_start)*1000
             payload={'ts':time.time(),'capture_ts':capture_ts,'stream_id':stream,'frame_id':sequence,
                 'src':src,'source_kind':kind,'w':width,'h':height,'fps':round(fps,1),'inference_ms':round(inference,1),
-                'model':'Generated detections' if kind=='simulation' else model_id or control.get('model'),'dets':dets,'frame':preview,'error':error}
+                'model':model_id or control.get('model'),'dets':dets,'frame':preview,'error':error}
             if motion_ts is not None:payload['motion_ts']=motion_ts
             payload['camera_rotation']=rotation
             payload['colour']=control.get('colour','natural')
