@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+.env.*
+node-client.json
+*.jpg
+*.jpeg
+*.png
+*.sqlite
+*.sqlite-*
