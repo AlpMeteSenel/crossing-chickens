@@ -44,6 +44,7 @@ class Hub:
         self.auto_led=False;self.manual=None;self.manual_revision=0;self.applied_revision=0
         self.auto_applied=False;self.led_signature=None;self.command_latency=None;self.mode_confirmed_latency=None
         self.last_command=None;self.error=None;self.sensors=None;self.mcu_ok=False;self.last_mcu=0
+        self.traffic=[0,0,0]
         self.brightness=10;self.brightness_applied=None
         try:
             saved=json.loads((ROOT/'led_settings.json').read_text()).get('brightness',10)
@@ -139,7 +140,7 @@ class Hub:
         age=max(0,(now-f.get('capture_ts',now))*1000) if f else None
         profile=self.profiles[self.control['source']]
         v=dict(self.engine.snapshot)
-        v.update(profile=profile,auto_led=self.auto_led,live=self.fresh_live(now),
+        v.update(profile=profile,auto_led=self.auto_led,live=self.fresh_live(now),traffic=self.traffic,
             frame_age_ms=round(age) if age is not None else None,
             command_latency_ms=self.command_latency,mode_confirmed_ms=self.mode_confirmed_latency,
             led_command=self.last_command,model=self.control['model'],source=self.control['source'],
@@ -263,6 +264,12 @@ class Hub:
                             led=data['led']
                             if not isinstance(led,list) or len(led)!=3:raise ValueError('RGB requires three channels')
                             self.manual_command(('set_led',tuple(max(0,min(255,int(v))) for v in led)))
+                        if 'traffic' in data:
+                            tr=data['traffic']
+                            if not isinstance(tr,list) or len(tr)!=3:raise ValueError('Traffic lights need [red, yellow, green] as 0 or 1')
+                            flags=[1 if int(float(v))>0 else 0 for v in tr]
+                            if await self.rpc('set_traffic_light',*flags) is not True:raise ValueError('The camera board rejected the traffic lights')
+                            self.traffic=flags
                     except (ValueError,TypeError) as e:await ws.send_json({'error':str(e)})
         finally:self.clients.discard(ws)
         return ws

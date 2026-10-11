@@ -1,4 +1,4 @@
-// SWARMFLOW sensor_hub v9: light/PIR, AHT20 Wire0, Movement Wire1, 30 WS2813 D6
+// SWARMFLOW sensor_hub v9: light/PIR, AHT20 Wire0, Movement Wire1, 30 WS2813 D6, traffic LEDs D8/D9/D10
 #include "Arduino_RouterBridge.h"
 #include <Wire.h>
 #include <Arduino_Modulino.h>
@@ -12,6 +12,9 @@ Ws2813D6 strip;
 
 const int PIN_LIGHT = A0;
 const int PIN_PIR   = D2;
+const int PIN_TL_RED = D8;
+const int PIN_TL_YEL = D9;
+const int PIN_TL_GRN = D10;
 const uint8_t AHT_ADDR = 0x38;
 
 ModulinoMovement movement;
@@ -24,6 +27,7 @@ std::atomic<int> mode{6};
 LedEffects::Settings effect_settings;
 k_mutex effect_mutex;
 std::atomic<uint32_t> manual_rgb{0};
+std::atomic<uint8_t> tl_state{0};
 
 uint32_t wheel(uint8_t p) {
   p = 255 - p;
@@ -181,9 +185,9 @@ bool set_led(int r, int g, int b) {
 }
 String led_status() {
   k_mutex_lock(&effect_mutex,K_FOREVER);const auto settings=effect_settings;k_mutex_unlock(&effect_mutex);
-  char buf[450];
-  snprintf(buf, sizeof(buf), "{\"pin\":\"D6/PB1\",\"pixels\":30,\"brightness_percent\":%d,\"driver_error\":%d,\"configuration_ok\":%s,\"frames_sent\":%lu,\"firmware\":\"hub9\",\"mode\":%d,\"max_animation_mode\":33,\"primary\":%lu,\"secondary\":%lu,\"speed\":%u,\"wave_width\":%u}",
-    strip.brightnessPercent(), strip.error(), strip.configurationValid() ? "true" : "false", (unsigned long)strip.frames(), mode.load(),
+char buf[500];
+    snprintf(buf, sizeof(buf), "{\"pin\":\"D6/PB1\",\"pixels\":30,\"brightness_percent\":%d,\"driver_error\":%d,\"configuration_ok\":%s,\"frames_sent\":%lu,\"firmware\":\"hub9\",\"mode\":%d,\"max_animation_mode\":33,\"traffic\":%d,\"primary\":%lu,\"secondary\":%lu,\"speed\":%u,\"wave_width\":%u}",
+    strip.brightnessPercent(), strip.error(), strip.configurationValid() ? "true" : "false", (unsigned long)strip.frames(), mode.load(), tl_state.load(),
     (unsigned long)((settings.primary.r<<16)|(settings.primary.g<<8)|settings.primary.b),
     (unsigned long)((settings.secondary.r<<16)|(settings.secondary.g<<8)|settings.secondary.b),settings.speed,settings.width);
   return String(buf);
@@ -191,6 +195,14 @@ String led_status() {
 bool set_brightness(int percent) {
   if (strip.error() < 0) return false;
   return strip.setBrightness(percent);
+}
+
+bool set_traffic_light(int r, int y, int g) {
+  digitalWrite(PIN_TL_RED, r > 0 ? HIGH : LOW);
+  digitalWrite(PIN_TL_YEL, y > 0 ? HIGH : LOW);
+  digitalWrite(PIN_TL_GRN, g > 0 ? HIGH : LOW);
+  tl_state = (uint8_t)((r > 0 ? 4 : 0) | (y > 0 ? 2 : 0) | (g > 0 ? 1 : 0));
+  return true;
 }
 
 void setup() {
@@ -206,8 +218,10 @@ void setup() {
   Bridge.provide("set_effect_config", set_effect_config);
   Bridge.provide("led_pin_test", led_pin_test);
   Bridge.provide("set_brightness", set_brightness);
+  Bridge.provide("set_traffic_light", set_traffic_light);
   Bridge.provide("i2c_scan", i2c_scan);
   pinMode(PIN_PIR, INPUT);
+  pinMode(PIN_TL_RED, OUTPUT); pinMode(PIN_TL_YEL, OUTPUT); pinMode(PIN_TL_GRN, OUTPUT);
   Wire.begin();
   Modulino.begin();
   imu_ok = movement.begin();
