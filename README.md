@@ -1,9 +1,72 @@
-# Crossing Chickens
+# Swarmflow
 
-On-board software for the Arduino UNO Q crossing node. The camera, tracker, and crossing lights keep running locally. `publisher/` sends telemetry to the city dashboard in [egg-dashboard](https://github.com/AlpMeteSenel/egg-dashboard).
+**Urban intelligence at the edge / Intelligenza urbana all’edge**
 
-- `vision/` is the node application: capture, detection, the local dashboard, and crossing or bus-stop behavior.
-- `publisher/` reads that local state and uploads it. It does not open the camera.
-- `firmware/` is the MCU sketch for the 30-LED strip.
+Swarmflow connects street cameras, local vision and physical alerts in one operational platform. Designed around Turin’s streets, it gives operators a clear view of crossings, traffic and transit-stop occupancy while keeping image processing close to the sensors.
 
-The node stores its own settings and upload queue on the board. Those files, credentials, and camera frames are not in this repository.
+## Italiano
+
+Swarmflow trasforma i dati delle telecamere stradali in informazioni utili per la sicurezza e la mobilità. Ogni nodo Arduino UNO Q elabora le immagini localmente; la dashboard raccoglie telemetria, eventi e indicatori in una mappa 3D della città.
+
+### Funzionalità
+
+- Rilevamento e tracciamento di pedoni, biciclette e veicoli, con conteggi direzionali.
+- Stima della velocità tramite calibrazione del piano stradale.
+- Zone configurabili per attraversamenti e monitoraggio dell’affollamento.
+- Segnalazioni LED e controllo temporizzato adattivo in base alla presenza di persone e veicoli.
+- Monitoraggio delle fermate: persone in attesa, soglie di affollamento e andamento nel tempo.
+- Mappa 3D con nodi, posizionamento delle telecamere, semafori e dati del trasporto pubblico.
+- Punteggio di attività dell’incrocio calcolato dai dati delle rilevazioni.
+- Segnalazioni di possibile collisione e chiamate vocali tramite Fish Audio e Twilio, con abilitazione esplicita e protezione dalle chiamate duplicate.
+- Modalità di risparmio energetico: dopo l’assenza di movimento PIR, il nodo chiude la cattura e sospende l’inferenza; il movimento riattiva l’elaborazione.
+- Eventi antimanomissione da variazioni persistenti dell’orientamento IMU, trasmessi alla dashboard.
+- Buffer video locale di 15 secondi, esportazione di filmati e registrazione con annotazioni.
+- Coda locale della telemetria e sincronizzazione automatica dopo la riconnessione.
+
+La velocità dipende dalla calibrazione e dal posizionamento della telecamera. Le segnalazioni di collisione sono basate sulle osservazioni video e richiedono valutazione da parte dell’operatore. Il risparmio energetico riguarda cattura e inferenza: il microcontrollore resta attivo per leggere i sensori.
+
+## English
+
+Swarmflow turns street-camera observations into actionable mobility and safety information. Arduino UNO Q nodes process imagery locally; the dashboard brings telemetry, events and intersection activity into a shared 3D city map.
+
+### Features
+
+- Pedestrian, bicycle and vehicle detection, tracking and directional passage counts.
+- Ground-calibrated speed estimates and configurable crossing/crowding areas.
+- LED alerts and adaptive timed signal control driven by pedestrian and vehicle presence.
+- Transit-stop occupancy, crowding thresholds and historical demand indicators.
+- A 3D map with camera placement, connected nodes, traffic signals and public transit data.
+- An intersection activity score calculated from observed people, vehicles and crossing occupancy.
+- Possible-collision alerts and Fish Audio/Twilio voice calls with explicit arming, cancellation delay and duplicate-call protection.
+- PIR-controlled camera duty cycling: capture and inference pause after inactivity and resume on motion.
+- IMU-based tamper events for sustained camera movement or tilt, forwarded to the server.
+- A local 15-second video buffer, clip export and annotated recording.
+- Durable offline telemetry queues and automatic synchronization on reconnection.
+
+Speed estimates depend on ground calibration and camera placement. Possible-collision alerts support operator assessment. Motion standby saves camera/inference work while the microcontroller continues sensor monitoring.
+
+## Architecture / Architettura
+
+`IMX219 + PIR + IMU → Arduino UNO Q vision → local alerts → authenticated telemetry → Next.js + SQLite → 3D dashboard`
+
+Sensor firmware provides PIR and orientation readings. The vision worker applies a 45-second sensor warm-up and a 20-second activity hold. Missing or stale sensor readings keep capture active. Tamper detection uses a stable orientation reference, consecutive observations and a 30-second event cooldown.
+
+## Hardware
+
+Arduino UNO Q 4 GB, UNO Media Carrier, Sony IMX219, Grove PIR, Grove movement/IMU sensor, AHT20 and a 30-LED addressable strip. ESP32 camera workers can publish into the same dashboard ingestion interface.
+
+## Software
+
+Python, OpenCV, Ultralytics/NCNN on the edge; Next.js, React, TypeScript and SQLite centrally; Mapbox/OpenFreeMap for visualization; Fish Audio and Twilio for voice notifications.
+
+## Avvio / Getting started
+
+Dashboard: Node.js 24+, `npm install`, then `npm run dev`. Open `http://localhost:3000`. Configure the public map token and private ingestion credential in `.env.local` using `.env.example`.
+
+Edge: install the Python dependencies in `vision/requirements.txt`, run the vision worker and collector from the same directory, then start the publisher with a private `node-client.json`. Existing systemd units provide service restart behavior. Keep one camera worker per device. Motion standby reads the collector’s atomic `sensor-state.json`.
+
+Use `npm run connect:usb` for the UNO Q USB route or `npm run connect:wifi -- <board-ip>` for Wi-Fi forwarding. Configure the voice service locally before enabling calls. Provider credentials and phone numbers remain server-side and are excluded from Git.
+
+## Repository
+
+This repository contains the UNO Q firmware, vision pipeline, local controls and telemetry publisher. The city dashboard is available in [egg-dashboard](https://github.com/AlpMeteSenel/egg-dashboard).
