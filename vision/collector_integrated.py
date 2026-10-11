@@ -257,7 +257,7 @@ class Hub:
                         data=json.loads(msg.data)
                         if 'mode' in data:
                             mode=data['mode']
-                            if type(mode) is not int or not 0<=mode<=33:raise ValueError('Unknown animation')
+                            if type(mode) is not int or not 0<=mode<=34:raise ValueError('Unknown animation')
                             # Keep the dashboard Off command compatible with older firmware.
                             self.manual_command(('set_led',(0,0,0)) if mode==6 else ('set_mode',(mode,)))
                         if 'led' in data:

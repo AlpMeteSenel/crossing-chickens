@@ -95,6 +95,18 @@ uint32_t effect_siren(uint32_t f) {
   return 50;
 }
 
+uint32_t effect_traffic_segments() {
+  const uint8_t s = tl_state.load();
+  for (int i = 0; i < NUM_LEDS; i++) {
+    const int seg = i * 3 / NUM_LEDS;
+    const bool on = (seg == 0 && (s & 4)) || (seg == 1 && (s & 2)) || (seg == 2 && (s & 1));
+    if (seg == 0) strip.setPixel(i, on ? 250 : 14, on ? 30 : 2, 0);
+    else if (seg == 1) strip.setPixel(i, on ? 250 : 14, on ? 165 : 10, 0);
+    else strip.setPixel(i, 0, on ? 250 : 12, on ? 60 : 8);
+  }
+  return 100;
+}
+
 bool aht_init() {
   Wire.beginTransmission(AHT_ADDR);
   Wire.write(0xBE); Wire.write(0x08); Wire.write(0x00);
@@ -174,7 +186,7 @@ String led_pin_test() {
   return String(buf);
 }
 bool set_mode(int m) {
-  if (strip.error() < 0 || m < 0 || m > LedEffects::Last) return false;
+  if (strip.error() < 0 || m < 0 || m > 34) return false;
   mode = m; return true;
 }
 bool set_led(int r, int g, int b) {
@@ -186,7 +198,7 @@ bool set_led(int r, int g, int b) {
 String led_status() {
   k_mutex_lock(&effect_mutex,K_FOREVER);const auto settings=effect_settings;k_mutex_unlock(&effect_mutex);
 char buf[500];
-    snprintf(buf, sizeof(buf), "{\"pin\":\"D6/PB1\",\"pixels\":30,\"brightness_percent\":%d,\"driver_error\":%d,\"configuration_ok\":%s,\"frames_sent\":%lu,\"firmware\":\"hub9\",\"mode\":%d,\"max_animation_mode\":33,\"traffic\":%d,\"primary\":%lu,\"secondary\":%lu,\"speed\":%u,\"wave_width\":%u}",
+    snprintf(buf, sizeof(buf), "{\"pin\":\"D6/PB1\",\"pixels\":30,\"brightness_percent\":%d,\"driver_error\":%d,\"configuration_ok\":%s,\"frames_sent\":%lu,\"firmware\":\"hub9\",\"mode\":%d,\"max_animation_mode\":34,\"traffic\":%d,\"primary\":%lu,\"secondary\":%lu,\"speed\":%u,\"wave_width\":%u}",
     strip.brightnessPercent(), strip.error(), strip.configurationValid() ? "true" : "false", (unsigned long)strip.frames(), mode.load(), tl_state.load(),
     (unsigned long)((settings.primary.r<<16)|(settings.primary.g<<8)|settings.primary.b),
     (unsigned long)((settings.secondary.r<<16)|(settings.secondary.g<<8)|settings.secondary.b),settings.speed,settings.width);
@@ -253,6 +265,7 @@ void loop() {
     case 8: strip.fill(0,255,0); d = 100; break;
     case 9: strip.fill(0,0,255); d = 100; break;
     case 10: { const uint32_t c = manual_rgb.load(); strip.fill(c >> 16, c >> 8, c); d = 100; break; }
+    case 34: d = effect_traffic_segments(); break;
     default: d = effect_ambient(analogRead(PIN_LIGHT)); break;
   }
   strip.show();
