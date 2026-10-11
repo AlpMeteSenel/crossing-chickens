@@ -45,6 +45,7 @@ class Hub:
         self.auto_applied=False;self.led_signature=None;self.command_latency=None;self.mode_confirmed_latency=None
         self.last_command=None;self.error=None;self.sensors=None;self.mcu_ok=False;self.last_mcu=0
         self.traffic=[0,0,0]
+        self.traffic_lights=None
         self.brightness=10;self.brightness_applied=None
         try:
             saved=json.loads((ROOT/'led_settings.json').read_text()).get('brightness',10)
@@ -145,7 +146,7 @@ class Hub:
         age=max(0,(now-f.get('capture_ts',now))*1000) if f else None
         profile=self.profiles[self.control['source']]
         v=dict(self.engine.snapshot)
-        v.update(profile=profile,auto_led=self.auto_led,live=self.fresh_live(now),traffic=self.traffic,
+        v.update(profile=profile,auto_led=self.auto_led,live=self.fresh_live(now),traffic=self.traffic,traffic_lights=self.traffic_lights,
             **self.node_cfg_report(),
             frame_age_ms=round(age) if age is not None else None,
             command_latency_ms=self.command_latency,mode_confirmed_ms=self.mode_confirmed_latency,
@@ -270,6 +271,10 @@ class Hub:
                             led=data['led']
                             if not isinstance(led,list) or len(led)!=3:raise ValueError('RGB requires three channels')
                             self.manual_command(('set_led',tuple(max(0,min(255,int(v))) for v in led)))
+                        if 'traffic_lights' in data:
+                            tl=data['traffic_lights']
+                            if isinstance(tl,list) and 1<=len(tl)<=8 and all(isinstance(f,(list,tuple)) and len(f)==3 for f in tl):
+                                self.traffic_lights=[list(map(int,f)) for f in tl]
                         if 'traffic' in data:
                             tr=data['traffic']
                             if not isinstance(tr,list) or len(tr)!=3:raise ValueError('Traffic lights need [red, yellow, green] as 0 or 1')
