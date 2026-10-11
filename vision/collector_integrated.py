@@ -135,12 +135,18 @@ class Hub:
                     self.bridge=Bridge('unix:///run/arduino-router.sock');self.bridge.connect()
             return self.bridge.call(name,*args,timeout=1.5)
         return await loop.run_in_executor(self.pool,invoke)
+    def node_cfg_report(self):
+        try:
+            d=json.loads(Path(os.environ.get('NODE_CFG_PATH','/home/arduino/swarmflow-uplink/nodes_cfg.json')).read_text())
+            return {'cfg':int(d.get('v',0)),'cfg_hash':str(d.get('hash',''))[:16]}
+        except Exception:return {'cfg':None,'cfg_hash':None}
     def payload(self):
         now=time.time();f=self.frame
         age=max(0,(now-f.get('capture_ts',now))*1000) if f else None
         profile=self.profiles[self.control['source']]
         v=dict(self.engine.snapshot)
         v.update(profile=profile,auto_led=self.auto_led,live=self.fresh_live(now),traffic=self.traffic,
+            **self.node_cfg_report(),
             frame_age_ms=round(age) if age is not None else None,
             command_latency_ms=self.command_latency,mode_confirmed_ms=self.mode_confirmed_latency,
             led_command=self.last_command,model=self.control['model'],source=self.control['source'],
