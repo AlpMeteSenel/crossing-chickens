@@ -9,7 +9,6 @@ node-client.json
 *.sqlite
 *.sqlite-*
 
-vision/sensor-state.json
 vision/recordings/
 vision/control.json
 vision/vision.json

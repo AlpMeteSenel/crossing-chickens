@@ -1,14 +1,6 @@
-"""PIR camera duty cycling and IMU orientation alerts."""
-import json,math,time,uuid
+"""IMU orientation monitoring and tamper alerts."""
+import math,uuid
 from collections import deque
-class MotionGate:
-    def __init__(self,root):self.path=root/'sensor-state.json';self.started=time.time();self.last_motion=self.started
-    def awake(self,now):
-        try:s=json.loads(self.path.read_text())
-        except (OSError,ValueError):return True
-        if now-s.get('_received_at',0)>3 or type(s.get('pir')) is not bool:return True
-        if s['pir']:self.last_motion=now
-        return now-self.started<45 or now-self.last_motion<20
 class TamperMonitor:
     def __init__(self):self.baseline=None;self.samples=[];self.hits=0;self.last_alert=0;self.events=deque(maxlen=20)
     def update(self,s,now):

@@ -14,7 +14,6 @@ from process_capture import ProcessCamera as CSICamera
 from vision_detail import focus_bounds,sweep_bounds,map_crop,merge_detections
 from marker_calibration import MarkerCalibration
 from camera_orientation import rotate_image,rotate_point,detail_crop
-from motion_security import MotionGate
 from ncnn_threads import ncnn_threads
 
 MODELS={
@@ -32,15 +31,10 @@ def read_control():
 def main():
     cap=None;active=None;model=None;model_id=None;stream=uuid.uuid4().hex
     sequence=0;next_probe=0;retry_delay=0;origin=time.monotonic();last_capture=0;fps=0;wb_revision=None
-    marker=None;marker_request=None;orientation=0;motion_gate=MotionGate(ROOT)
+    marker=None;marker_request=None;orientation=0
     try:
         while True:
             start=time.monotonic();control=read_control();source=control.get('source','camera')
-            if source=='camera' and control.get('motion_wake',True) and not motion_gate.awake(time.time()):
-                if cap:cap.release();cap=None
-                sequence+=1;fps=0;last_capture=0
-                atomic(ROOT/'vision.json',{'ts':time.time(),'capture_ts':time.time(),'stream_id':stream,'frame_id':sequence,'source_kind':'idle','src':'PIR standby','power_state':'standby','fps':0,'inference_ms':0,'dets':[],'frame':None,'w':0,'h':0,'camera_rotation':control.get('camera_rotation',0),'error':None})
-                time.sleep(.2);continue
             rotation=control.get('camera_rotation',0) if source=='camera' else 0
             if rotation!=orientation:
                 orientation=rotation;stream=uuid.uuid4().hex;last_capture=0;fps=0

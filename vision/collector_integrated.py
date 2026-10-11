@@ -147,7 +147,7 @@ class Hub:
         now=time.time();f=self.frame
         age=max(0,(now-f.get('capture_ts',now))*1000) if f else None
         profile=self.profiles[self.control['source']]
-        v=dict(self.engine.snapshot);v['events']=list(v.get('events',[]))+list(self.tamper.events);v['power_state']=(f or {}).get('power_state','active')
+        v=dict(self.engine.snapshot);v['events']=list(v.get('events',[]))+list(self.tamper.events)
         v.update(profile=profile,auto_led=self.auto_led,live=self.fresh_live(now),traffic=self.traffic,traffic_lights=self.traffic_lights,countdown=self.countdown,
             **self.node_cfg_report(),
             frame_age_ms=round(age) if age is not None else None,
@@ -176,7 +176,7 @@ class Hub:
             try:
                 frame=json.loads((ROOT/'vision.json').read_text())
                 identity=(frame.get('stream_id'),frame.get('frame_id'))
-                source_matches=frame.get('source_kind') in ({'live','idle','unavailable'} if self.control['source']=='camera' else {self.control['source']})
+                source_matches=frame.get('source_kind') in ({'live','unavailable'} if self.control['source']=='camera' else {self.control['source']})
                 if self.control['source']=='camera':source_matches=source_matches and frame.get('camera_rotation',0)==self.control.get('camera_rotation',0)
                 if not source_matches:
                     self.frame=None;self.engine.expire()
@@ -236,7 +236,7 @@ class Hub:
                     sensor=await self.rpc('read_sensors')
                     if isinstance(sensor,(str,bytes)):sensor=json.loads(sensor)
                     if not isinstance(sensor,dict):raise ValueError('Invalid sensor response')
-                    sensor['_received_at']=time.time();atomic(ROOT/'sensor-state.json',sensor);self.tamper.update(sensor,time.time());self.sensors=sensor;self.mcu_ok=True;self.last_mcu=time.time();self.error=None
+                    self.tamper.update(sensor,time.time());self.sensors=sensor;self.mcu_ok=True;self.last_mcu=time.time();self.error=None
                     if self.last_command and self.mode_confirmed_latency is None:
                         expected=self.last_command['args'][0] if self.last_command['method']=='set_mode' else 10
                         if sensor.get('led_mode')==expected:self.mode_confirmed_latency=round((time.time()-self.last_command['at'])*1000,1)
