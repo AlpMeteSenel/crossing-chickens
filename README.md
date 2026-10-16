@@ -24,6 +24,8 @@ Swarmflow trasforma i dati delle telecamere stradali in informazioni utili per l
 
 La velocità dipende dalla calibrazione e dal posizionamento della telecamera. Le segnalazioni di collisione sono basate sulle osservazioni video e richiedono valutazione da parte dell’operatore.
 
+[Video di Presentazione di EGG — by Crossing Chickens](https://youtu.be/gVzeYpoJ9_o?si=foS2Aurb5qrJZLUc)
+
 ## English
 
 Swarmflow turns street-camera observations into actionable mobility and safety information. Arduino UNO Q nodes process imagery locally; the dashboard brings telemetry, events and intersection activity into a shared 3D city map.
@@ -42,6 +44,8 @@ Swarmflow turns street-camera observations into actionable mobility and safety i
 - Durable offline telemetry queues and automatic synchronization on reconnection.
 
 Speed estimates depend on ground calibration and camera placement. Possible-collision alerts support operator assessment.
+
+[Video Presentation: EGG — by Crossing Chickens](https://youtu.be/gVzeYpoJ9_o?si=foS2Aurb5qrJZLUc)
 
 ## Architecture / Architettura
 
